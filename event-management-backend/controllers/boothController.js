@@ -7,8 +7,22 @@ import { validationResult } from "express-validator";
 export const getAllBooths = async (req, res) => {
   try {
     const { page = 1, limit = 20, category, status, priceMin, priceMax } = req.query;
+    const expoId = req.params.expoId;
     
-    let query = { expo: req.params.expoId };
+    let query = {};
+    
+    // If expoId is provided in params, filter by expo
+    if (expoId) {
+      query.expo = expoId;
+    }
+    
+    // If user is not admin, only show booths for expos they organize
+    if (req.user && req.user.role !== 'admin') {
+      const userExpos = await Expo.find({ organizer: req.user.id }).select('_id');
+      const expoIds = userExpos.map(expo => expo._id);
+      query.expo = { $in: expoIds };
+    }
+    
     if (category) query.category = category;
     if (status) query.status = status;
     if (priceMin || priceMax) {
@@ -18,6 +32,7 @@ export const getAllBooths = async (req, res) => {
     }
 
     const booths = await Booth.find(query)
+      .populate("expo", "title startDate endDate location")
       .populate("exhibitor", "name company position avatar")
       .sort({ boothNumber: 1 })
       .limit(limit * 1)
@@ -61,7 +76,13 @@ export const createBooth = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const expo = await Expo.findById(req.body.expo);
+    // Map expoId to expo for the database
+    const boothData = {
+      ...req.body,
+      expo: req.body.expoId || req.body.expo
+    };
+
+    const expo = await Expo.findById(boothData.expo);
     if (!expo) {
       return res.status(404).json({ message: "Expo not found" });
     }
@@ -70,17 +91,41 @@ export const createBooth = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to create booths for this expo" });
     }
 
+    // Generate booth number if not provided
+    let boothNumber = req.body.boothNumber;
+    if (!boothNumber) {
+      const lastBooth = await Booth.findOne({ expo: boothData.expo })
+        .sort({ boothNumber: -1 });
+      
+      if (lastBooth) {
+        // Extract number from last booth number (e.g., "A1" -> 1, "B15" -> 15)
+        const match = lastBooth.boothNumber.match(/(\d+)$/);
+        const lastNumber = match ? parseInt(match[1]) : 0;
+        boothNumber = `B${lastNumber + 1}`;
+      } else {
+        boothNumber = "B1";
+      }
+    }
+
     // Check if booth number already exists for this expo
     const existingBooth = await Booth.findOne({
-      expo: req.body.expo,
-      boothNumber: req.body.boothNumber
+      expo: boothData.expo,
+      boothNumber: boothNumber
     });
 
     if (existingBooth) {
       return res.status(400).json({ message: "Booth number already exists for this expo" });
     }
 
-    const booth = new Booth(req.body);
+    const finalBoothData = {
+      ...boothData,
+      boothNumber,
+      createdBy: req.user.id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const booth = new Booth(finalBoothData);
     await booth.save();
 
     res.status(201).json({ message: "Booth created successfully", booth });
@@ -98,13 +143,35 @@ export const updateBooth = async (req, res) => {
     }
 
     const expo = await Expo.findById(booth.expo);
-    if (expo.organizer.toString() !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Not authorized" });
+    if (!expo) {
+      return res.status(404).json({ message: "Expo not found" });
     }
+
+    if (expo.organizer.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to update this booth" });
+    }
+
+    // Check if booth number is being changed and if it conflicts with existing booths
+    if (req.body.boothNumber && req.body.boothNumber !== booth.boothNumber) {
+      const existingBooth = await Booth.findOne({
+        expo: booth.expo,
+        boothNumber: req.body.boothNumber,
+        _id: { $ne: req.params.id }
+      });
+
+      if (existingBooth) {
+        return res.status(400).json({ message: "Booth number already exists for this expo" });
+      }
+    }
+
+    const updateData = {
+      ...req.body,
+      updatedAt: new Date()
+    };
 
     const updatedBooth = await Booth.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 

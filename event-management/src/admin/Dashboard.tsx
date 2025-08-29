@@ -6,17 +6,7 @@ import { OrganizerDashboard } from "./components/OrganizerDashboard";
 import { ExhibitorDashboard } from "./components/ExhibitorDashboard";
 import { AttendeeDashboard } from "./components/AttendeeDashboard";
 import { LoadingSpinner } from "./components/LoadingSpinner";
-
-// Mock user data - replace with actual authentication logic
-const mockUser = {
-  id: "1",
-  name: "John Doe",
-  email: "john@example.com",
-  role: "admin", // This would come from your auth context
-  avatar: "",
-  company: "SmartFlow Inc",
-  position: "System Administrator"
-};
+import { useAuth } from "../contexts/AuthContext";
 
 type UserRole = "admin" | "organizer" | "exhibitor" | "attendee";
 
@@ -31,28 +21,15 @@ interface User {
 }
 
 const Dashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call to get user data
-    const fetchUser = async () => {
-      try {
-        // TODO: Replace with actual authentication logic
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setUser(mockUser);
-      } catch (error) {
-        console.error("Failed to fetch user:", error);
-        // Redirect to login if authentication fails
-        navigate("/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [navigate]);
+    // Redirect to login if not authenticated
+    if (!isLoading && !user) {
+      navigate("/login");
+    }
+  }, [user, isLoading, navigate]);
 
   if (isLoading) {
     return <LoadingSpinner />;

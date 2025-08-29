@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
 
 import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import expoRoutes from "./routes/expoRoutes.js";
 import boothRoutes from "./routes/boothRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
@@ -15,10 +16,13 @@ import feedbackRoutes from "./routes/feedbackRoutes.js";
 dotenv.config();
 const app = express();
 
-// Rate limiting
+// Rate limiting - More permissive for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 1000 requests per windowMs (increased for development)
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Middleware
@@ -27,15 +31,14 @@ app.use(express.json());
 app.use(limiter);
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, { 
-  useNewUrlParser: true, 
-  useUnifiedTopology: true 
-})
-.then(() => console.log("MongoDB connected"))
+const mongoURI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/expo_db";
+mongoose.connect(mongoURI)
+.then(() => console.log("MongoDB connected to:", mongoURI))
 .catch(err => console.log("MongoDB error:", err));
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/expos", expoRoutes);
 app.use("/api/booths", boothRoutes);
 app.use("/api/sessions", sessionRoutes);

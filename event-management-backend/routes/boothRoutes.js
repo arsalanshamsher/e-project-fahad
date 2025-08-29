@@ -1,5 +1,6 @@
 import express from "express";
 import { authenticate, authorizeRoles } from "../middleware/auth.js";
+import { validateBooth, validateBoothUpdate } from "../middleware/boothValidation.js";
 import { 
   getAllBooths, 
   getBoothById, 
@@ -24,8 +25,9 @@ router.get("/:id", getBoothById);
 router.use(authenticate);
 
 // Organizer/Admin routes
-router.post("/", authorizeRoles("organizer", "admin"), createBooth);
-router.put("/:id", authorizeRoles("organizer", "admin"), updateBooth);
+router.get("/", authorizeRoles("organizer", "admin"), getAllBooths);
+router.post("/", authorizeRoles("organizer", "admin"), validateBooth, createBooth);
+router.put("/:id", authorizeRoles("organizer", "admin"), validateBoothUpdate, updateBooth);
 router.delete("/:id", authorizeRoles("organizer", "admin"), deleteBooth);
 router.get("/expo/:expoId/analytics", authorizeRoles("organizer", "admin"), getBoothAnalytics);
 

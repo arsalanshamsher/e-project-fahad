@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Navigation } from "@/components/Navigation";
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building, Globe, ArrowLeft, Linkedin, Twitter, Facebook } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
+  role: z.enum(["admin", "organizer", "exhibitor", "attendee"], {
+    required_error: "Please select a role"
+  }),
   phone: z.string().optional(),
   company: z.string().optional(),
   position: z.string().optional(),
@@ -41,6 +46,7 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { register } = useAuth();
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -49,6 +55,7 @@ const Signup = () => {
       email: "",
       password: "",
       confirmPassword: "",
+      role: "attendee",
       phone: "",
       company: "",
       position: "",
@@ -68,16 +75,19 @@ const Signup = () => {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
-      // TODO: Implement actual signup logic with backend
-      console.log("Signup data:", data);
+      // Prepare data for backend (remove confirmPassword and format for API)
+      const { confirmPassword, ...signupData } = data;
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use authentication context for registration
+      await register(signupData);
       
-      // Redirect to login page or dashboard
+      // Show success message and redirect to login
+      alert('Registration successful! Please login with your credentials.');
       navigate("/login");
     } catch (error) {
       console.error("Signup error:", error);
+      // Show error message to user
+      alert(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -225,6 +235,31 @@ const Signup = () => {
                     )}
                   />
                 </div>
+
+                {/* Role Selection */}
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Role *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-12 border-border focus:ring-2 focus:ring-primary/20">
+                            <SelectValue placeholder="Select your role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="attendee">Event Attendee</SelectItem>
+                          <SelectItem value="exhibitor">Exhibitor</SelectItem>
+                          <SelectItem value="organizer">Event Organizer</SelectItem>
+                          <SelectItem value="admin">Administrator</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* Contact Information */}
                 <div className="grid md:grid-cols-2 gap-6">

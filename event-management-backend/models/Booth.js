@@ -2,38 +2,36 @@
 import mongoose from "mongoose";
 
 const boothSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  description: { type: String, required: true },
+  type: { 
+    type: String, 
+    enum: ["standard", "premium", "vip", "corner", "island"], 
+    required: true 
+  },
   expo: { type: mongoose.Schema.Types.ObjectId, ref: "Expo", required: true },
   boothNumber: { type: String, required: true },
-  size: {
-    width: { type: Number, required: true }, // in meters
-    length: { type: Number, required: true }, // in meters
-    area: { type: Number, required: true } // in square meters
-  },
-  location: {
-    floor: { type: String, default: "Main Floor" },
-    section: { type: String },
-    coordinates: {
-      x: Number,
-      y: Number
-    }
-  },
-  category: { type: String, required: true }, // Standard, Premium, VIP, etc.
+  size: { type: String, required: true }, // e.g., "10x10 ft"
   price: { type: Number, required: true },
+  maxCapacity: { type: Number, required: true },
+  location: { type: String, required: true }, // e.g., "A1", "B2", "Main Hall"
   status: { 
     type: String, 
     enum: ["available", "reserved", "occupied", "maintenance"], 
     default: "available" 
   },
+  amenities: [{ type: String }], // Array of amenity names
   exhibitor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  
+  // Additional fields for enhanced functionality
+  category: { type: String, default: "Standard" },
   features: [{
     name: String,
     description: String,
     included: { type: Boolean, default: true }
-  }],
-  amenities: [{
-    name: String,
-    description: String,
-    quantity: Number
   }],
   restrictions: [String],
   images: [{
@@ -77,5 +75,6 @@ boothSchema.index({ expo: 1, boothNumber: 1 }, { unique: true });
 boothSchema.index({ expo: 1, status: 1 });
 boothSchema.index({ exhibitor: 1 });
 boothSchema.index({ category: 1, price: 1 });
+boothSchema.index({ createdBy: 1 });
 
 export default mongoose.model("Booth", boothSchema);

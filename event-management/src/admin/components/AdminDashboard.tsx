@@ -1,20 +1,32 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { 
+  BarChart3, 
+  TrendingUp, 
   Users, 
   Calendar, 
-  BarChart3, 
   Settings, 
-  Shield, 
-  Activity, 
-  TrendingUp, 
-  AlertCircle,
   Plus,
+  UserPlus,
+  CalendarPlus,
+  Store,
+  Activity,
+  Shield,
   Eye,
-  Edit,
-  Trash2
+  AlertCircle
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUsers, useExpos, useRealTimeData, useBooths } from "../../hooks/useDynamicData";
+import { useQueryClient } from "@tanstack/react-query";
+import { UserForm } from "../../components/forms/UserForm";
+import { ExpoManagement } from "./ExpoManagement";
+import { BoothForm } from "../../components/forms/BoothForm";
+import { AnalyticsDashboard } from "../../components/analytics/AnalyticsDashboard";
+import { userAPI, boothAPI } from "../../lib/api";
+import { DataTable } from "../../components/tables/DataTable";
+import { ExpoForm } from "../../components/forms/ExpoForm";
 
 interface User {
   id: string;
@@ -32,28 +44,77 @@ interface AdminDashboardProps {
 
 export const AdminDashboard = ({ user }: AdminDashboardProps) => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [showExpoForm, setShowExpoForm] = useState(false);
+  const [showBoothForm, setShowBoothForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingBoothId, setEditingBoothId] = useState<string | null>(null);
 
-  // Mock data - replace with actual API calls
+  // Get query client for cache invalidation
+  const queryClient = useQueryClient();
+
+  // Fetch real data using hooks
+  const { data: usersData, isLoading: usersLoading } = useUsers();
+  const { data: exposData, isLoading: exposLoading } = useExpos();
+  const { data: realTimeData, isLoading: realTimeLoading } = useRealTimeData();
+  const { data: boothsData, isLoading: boothsLoading } = useBooths();
+
+  // Calculate real-time stats
   const stats = {
-    totalUsers: 1250,
-    totalEvents: 45,
-    activeEvents: 12,
-    totalRevenue: 125000,
-    growthRate: 23.5,
-    systemHealth: 99.8
+    totalUsers: usersData?.users?.length || 0,
+    totalEvents: exposData?.expos?.length || 0,
+    activeEvents: exposData?.expos?.filter((expo: any) => expo.status === 'active')?.length || 0,
+    totalRevenue: exposData?.expos?.reduce((sum: number, expo: any) => sum + (expo.boothPrice * (expo.maxExhibitors || 0)), 0) || 0,
+    growthRate: realTimeData?.systemStatus?.growthRate || 0,
+    systemHealth: realTimeData?.systemStatus?.health || 99.8
   };
 
-  const recentUsers = [
-    { id: "1", name: "Alice Johnson", email: "alice@example.com", role: "organizer", status: "active" },
-    { id: "2", name: "Bob Smith", email: "bob@example.com", role: "exhibitor", status: "pending" },
-    { id: "3", name: "Carol Davis", email: "carol@example.com", role: "attendee", status: "active" },
-  ];
+  const recentUsers = usersData?.users?.slice(0, 3) || [];
+  const systemAlerts = realTimeData?.liveUpdates?.slice(0, 3) || [];
 
-  const systemAlerts = [
-    { id: "1", type: "warning", message: "High server load detected", time: "2 minutes ago" },
-    { id: "2", type: "info", message: "Database backup completed", time: "1 hour ago" },
-    { id: "3", type: "success", message: "New user registration spike", time: "3 hours ago" },
-  ];
+  // User management functions
+  const handleAddUser = () => {
+    setEditingId(null);
+    setShowUserForm(true);
+  };
+
+  const handleEditUser = (id: string) => {
+    setEditingId(id);
+    setShowUserForm(true);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        console.log('Deleting user:', id);
+        
+        // Call the delete API
+        await userAPI.delete(id);
+        
+        // Show success message
+        alert('User deleted successfully');
+        
+        // Refresh users data by invalidating the query
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+        
+      } catch (error) {
+        console.error('Delete user error:', error);
+        alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  };
+
+  const handleUserFormSuccess = () => {
+    setShowUserForm(false);
+    setEditingId(null);
+    // Refresh users data by invalidating the query
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
+
+  const handleUserFormCancel = () => {
+    setShowUserForm(false);
+    setEditingId(null);
+  };
 
   const renderOverview = () => (
     <div className="space-y-6">
@@ -122,7 +183,7 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
             <div className="h-64 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                <p>Chart component will be integrated here</p>
+                <p>Advanced analytics will be integrated here</p>
               </div>
             </div>
           </CardContent>
@@ -224,51 +285,51 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
   const renderUsers = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">User Management</h2>
-        <Button variant="hero">
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
-      </div>
-      
-      <Card className="bg-glass-effect border-0 shadow-medium">
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>Manage user accounts and permissions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {recentUsers.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-background/50">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-sm font-medium text-primary">
-                      {user.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                    <p className="text-xs text-primary font-medium capitalize">{user.role}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {showUserForm ? (
+        <UserForm
+          userId={editingId || undefined}
+          onSuccess={handleUserFormSuccess}
+          onCancel={handleUserFormCancel}
+        />
+      ) : (
+        <DataTable
+          title="User Management"
+          data={usersData?.users || []}
+          columns={[
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'email', label: 'Email', sortable: true },
+            { key: 'role', label: 'Role', sortable: true },
+            { key: 'company', label: 'Company', sortable: true },
+            { key: 'status', label: 'Status', sortable: true },
+            { key: 'createdAt', label: 'Created', sortable: true },
+          ]}
+          loading={usersLoading}
+          onAdd={handleAddUser}
+          onEdit={handleEditUser}
+          onDelete={handleDeleteUser}
+          filters={[
+            {
+              key: 'role',
+              label: 'Role',
+              options: [
+                { value: 'admin', label: 'Administrator' },
+                { value: 'organizer', label: 'Organizer' },
+                { value: 'exhibitor', label: 'Exhibitor' },
+                { value: 'attendee', label: 'Attendee' },
+              ],
+            },
+            {
+              key: 'status',
+              label: 'Status',
+              options: [
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'pending', label: 'Pending' },
+              ],
+            },
+          ]}
+        />
+      )}
     </div>
   );
 
@@ -355,7 +416,10 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
       <div className="flex space-x-1 bg-background/50 rounded-lg p-1 mb-8">
         {[
           { id: "overview", label: "Overview", icon: BarChart3 },
+          { id: "analytics", label: "Analytics", icon: TrendingUp },
           { id: "users", label: "Users", icon: Users },
+          { id: "expos", label: "Expos", icon: Calendar },
+          { id: "booths", label: "Booths", icon: Store },
           { id: "settings", label: "Settings", icon: Settings }
         ].map((tab) => (
           <button
@@ -375,7 +439,59 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
       {/* Content */}
       {activeTab === "overview" && renderOverview()}
+      {activeTab === "analytics" && <AnalyticsDashboard />}
       {activeTab === "users" && renderUsers()}
+      {activeTab === "expos" && <ExpoManagement />}
+      {activeTab === "booths" && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Booth Management</h2>
+          <Button onClick={() => setShowBoothForm(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add New Booth
+          </Button>
+          {showBoothForm ? (
+            <BoothForm 
+              boothId={editingBoothId || undefined}
+              onSuccess={() => {
+                setShowBoothForm(false);
+                setEditingBoothId(null);
+                queryClient.invalidateQueries({ queryKey: ['booths'] });
+              }} 
+              onCancel={() => {
+                setShowBoothForm(false);
+                setEditingBoothId(null);
+              }} 
+            />
+          ) : (
+            <DataTable
+              title="Booths"
+              data={boothsData?.booths || []}
+              columns={[
+                { key: 'name', label: 'Name', sortable: true },
+                { key: 'type', label: 'Type', sortable: true },
+                { key: 'price', label: 'Price', sortable: true },
+                { key: 'status', label: 'Status', sortable: true },
+                { key: 'actions', label: 'Actions' }
+              ]}
+              loading={boothsLoading}
+              onEdit={(id) => {
+                setEditingBoothId(id);
+                setShowBoothForm(true);
+              }}
+              onDelete={(id) => {
+                if (confirm('Are you sure you want to delete this booth?')) {
+                  boothAPI.delete(id).then(() => {
+                    alert('Booth deleted successfully');
+                    queryClient.invalidateQueries({ queryKey: ['booths'] });
+                  }).catch(error => {
+                    alert(`Failed to delete booth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  });
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
       {activeTab === "settings" && renderSettings()}
     </div>
   );
