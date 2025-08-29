@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Navigation } from "@/components/Navigation";
 import heroImage from "@/assets/hero-illustration.jpg";
 
 export const Hero = () => {
   return (
     <section className="bg-hero-gradient py-20 px-4 overflow-hidden">
+      <Navigation />
+      
       <div className="container mx-auto max-w-7xl">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="text-center lg:text-left animate-fade-in">
@@ -24,10 +28,12 @@ export const Hero = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button variant="hero" size="xl" className="group">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
+              <Link to="/signup">
+                <Button variant="hero" size="xl" className="group">
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
               
               <Button variant="heroSecondary" size="xl" className="group">
                 <Play className="mr-2 h-5 w-5" />
